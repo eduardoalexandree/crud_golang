@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"sync"
+	"time"
 )
 
 type Coaster struct {
@@ -59,14 +61,30 @@ func (h *coasterHandlers) get(w http.ResponseWriter, r *http.Request) {
 
 func (h *coasterHandlers) post(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, err := io.ReadAll(r.Body)
+	defer r.Body.Close()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+	}
+
+	var coaster Coaster
+	err = json.Unmarshal(bodyBytes, &coaster)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(err.Error()))
+	}
+
+	coaster.ID = fmt.Sprintf("%d", time.Now().UnixNano()) // "Sprintf is used to create a formatted string representation of values."
+
 	h.Lock()
+	h.store[coaster.ID] = coaster
 	defer h.Unlock()
 }
 
 func newCoasterHandlers() *coasterHandlers {
 	return &coasterHandlers{
 		store: map[string]Coaster{
-			"id1": Coaster{
+			"id1": {
 				Name:         "fury",
 				Height:       99,
 				ID:           "id1",
